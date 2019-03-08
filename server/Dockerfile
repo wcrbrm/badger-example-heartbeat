@@ -22,4 +22,5 @@ FROM alpine:3.9
 COPY --from=build /usr/bin/server /root/
 EXPOSE 8092
 WORKDIR /root/
+VOLUME /badger
 CMD ["./server"]

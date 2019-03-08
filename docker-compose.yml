@@ -1,6 +1,6 @@
 version: '3'
 services:
-   db:
+   heartbeat-db:
       image: postgres:11-alpine
       environment:
          - POSTGRES_USER=postgres
@@ -8,12 +8,15 @@ services:
       volumes:
          - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       restart: "always"
-   server:
+   heartbeat-api:
       build: ./server/
       ports:
          - "8092:8092"
+      volumes:
+         - ./db/badger:/badger
       environment:
-         - PGSQL_DSN=postgresql://postgres:postgres@db:5432/postgres?sslmode=disable
+         - PGSQL_DSN=postgresql://postgres:postgres@heartbeat-db:5432/postgres?sslmode=disable
          - HOST=0.0.0.0
          - PORT=8092
+         - BADGER_DIR=/badger
       restart: "always"
