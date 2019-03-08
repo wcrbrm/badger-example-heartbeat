@@ -1,0 +1,19 @@
+version: '3'
+services:
+   db:
+      image: postgres:11-alpine
+      environment:
+         - POSTGRES_USER=postgres
+         - POSTGRES_PASSWORD=postgres
+      volumes:
+         - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      restart: "always"
+   server:
+      build: ./server/
+      ports:
+         - "8092:8092"
+      environment:
+         - PGSQL_DSN=postgresql://postgres:postgres@db:5432/postgres?sslmode=disable
+         - HOST=0.0.0.0
+         - PORT=8092
+      restart: "always"
