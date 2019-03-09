@@ -1,13 +1,15 @@
 package main
 
 import (
-	"fmt"
+	"log"
+	"os"
 
 	ginprom "github.com/Depado/ginprom"
 	_ "github.com/dgraph-io/badger"
 	gin "github.com/gin-gonic/gin"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
+	cli "github.com/jawher/mow.cli"
 	_ "github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -106,38 +108,68 @@ var Schema, _ = graphql.NewSchema(graphql.SchemaConfig{
 	Mutation: rootMutation,
 })
 
+var app = cli.App("heartbeat", "Heartbeat server")
+
 func main() {
-	fmt.Println("Starting")
+
+	enableGraphQL := app.Bool(cli.BoolOpt{
+		Name:  "graphql",
+		Desc:  "Serve API via GraphQL",
+		Value: true,
+	})
+	enableHeartBeat := app.Bool(cli.BoolOpt{
+		Name:  "heartbeat",
+		Desc:  "Accept heartbeats",
+		Value: true,
+	})
+	enableMetrics := app.Bool(cli.BoolOpt{
+		Name:   "metrics",
+		Desc:   "Enable prometheus metrics",
+		EnvVar: "ENABLE_PROMETHEUS",
+		Value:  true,
+	})
+	if err := app.Run(os.Args); err != nil {
+		log.Fatalln(err)
+	}
 
 	r := gin.Default()
-
-	p := ginprom.New(
-		ginprom.Engine(r),
-		ginprom.Subsystem("gin"),
-		ginprom.Path("/metrics"),
-	)
-	r.Use(p.Instrument())
-
-	// mode #1 - heartbeats tracking, using badger as temp storage
-	// (should not be replicated)
-	r.POST("/heartbeat", func(c *gin.Context) {})
-	r.GET("/active", func(c *gin.Context) {})
-	r.GET("/all", func(c *gin.Context) {})
-
-	// mode #2 - graphql server
-	// (stateless, can be replicated)
-	// Creates a GraphQL-go HTTP handler with the defined schema
-	hGraphql := handler.New(&handler.Config{
-		Schema:   &Schema,
-		Pretty:   true,
-		GraphiQL: true,
-	})
-	graphQL := func(c *gin.Context) {
-		hGraphql.ServeHTTP(c.Writer, c.Request)
+	if *enableMetrics {
+		p := ginprom.New(
+			ginprom.Engine(r),
+			ginprom.Subsystem("gin"),
+			ginprom.Path("/metrics"),
+		)
+		r.Use(p.Instrument())
 	}
-	r.POST("/graphql", graphQL)
-	r.GET("/graphql", graphQL)
+
+	if *enableHeartBeat {
+		// mode #1 - heartbeats tracking, using badger as temp storage
+		// (should not be replicated)
+		r.POST("/heartbeat", func(c *gin.Context) {})
+		r.GET("/active", func(c *gin.Context) {})
+		r.GET("/all", func(c *gin.Context) {})
+	}
+
+	if *enableGraphQL {
+		// mode #2 - graphql server
+		// (stateless, can be replicated)
+		// Creates a GraphQL-go HTTP handler with the defined schema
+		hGraphql := handler.New(&handler.Config{
+			Schema:   &Schema,
+			Pretty:   true,
+			GraphiQL: true,
+		})
+		graphQL := func(c *gin.Context) {
+			hGraphql.ServeHTTP(c.Writer, c.Request)
+		}
+		r.POST("/graphql", graphQL)
+		r.GET("/graphql", graphQL)
+	}
 
 	// TODO: port configuration using mow.cli
-	r.Run("0.0.0.0:8092")
+	if *enableGraphQL || *enableHeartBeat {
+		r.Run("0.0.0.0:8092")
+	} else {
+		log.Fatal("Either GraphQL or Heartbeat should be enabled")
+	}
 }
