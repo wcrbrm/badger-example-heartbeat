@@ -9,6 +9,9 @@ RUN go get -u "github.com/dgraph-io/badger" \
  && go get -u "github.com/lib/pq" \
  && go get -u "github.com/jawher/mow.cli"
 
+RUN go get -u "github.com/graphql-go/graphql" \
+    go get -u "github.com/graphql-go/handler"
+
 RUN mkdir -p /go/src/github.com/wcrbrm/badger-example-heartbeat/server
 WORKDIR /go/src/github.com/wcrbrm/badger-example-heartbeat/server
 
