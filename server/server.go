@@ -5,7 +5,7 @@ import (
 	"os"
 
 	ginprom "github.com/Depado/ginprom"
-	_ "github.com/dgraph-io/badger"
+	badger "github.com/dgraph-io/badger"
 	gin "github.com/gin-gonic/gin"
 	"github.com/graphql-go/graphql"
 	"github.com/graphql-go/handler"
@@ -137,6 +137,12 @@ func main() {
 			EnvVar: "LISTEN_ADDR",
 			Value:  "0.0.0.0:8092",
 		})
+		badgerPath = app.String(cli.StringOpt{
+			Name:   "b path",
+			Desc:   "Sets path to the badger database",
+			EnvVar: "BADGER_PATH",
+			Value:  "../db/badger",
+		})
 	)
 	// Specify the action to execute when the app is invoked correctly
 	app.Action = func() {
@@ -156,11 +162,41 @@ func main() {
 	}
 
 	if *enableHeartBeat {
+
+		// initializing badger database
+		opts := badger.DefaultOptions
+		opts.Dir = *badgerPath
+		opts.ValueDir = *badgerPath
+		db, err := badger.Open(opts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
+
 		// mode #1 - heartbeats tracking, using badger as temp storage
-		// (should not be replicated)
-		r.POST("/heartbeat", func(c *gin.Context) {})
-		r.GET("/active", func(c *gin.Context) {})
-		r.GET("/all", func(c *gin.Context) {})
+		// (this API should not be replicated)
+		r.POST("/heartbeat", func(c *gin.Context) {
+			// Start a writable transaction.
+			txn := db.NewTransaction(true)
+			defer txn.Discard()
+
+			// Use the transaction...
+			err := txn.Set([]byte("exampleKey"), []byte("exampleValue"))
+			if err != nil {
+				c.JSON(426, gin.H{"error": err})
+				return
+			}
+			// Commit the transaction and check for error.
+			if err := txn.Commit(); err != nil {
+				c.JSON(426, gin.H{"error": err})
+				return
+			}
+			c.JSON(200, gin.H{"message": "ok"})
+		})
+
+		r.GET("/active", func(c *gin.Context) {
+
+		})
 	}
 
 	if *enableGraphQL {
