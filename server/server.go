@@ -14,6 +14,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// see more at liu0fanyi/web_for_fun
+
 // Interval struct should reflect database record
 type Interval struct {
 	ID      string `json:"id"`
@@ -112,22 +114,33 @@ var app = cli.App("heartbeat", "Heartbeat server")
 
 func main() {
 
-	enableGraphQL := app.Bool(cli.BoolOpt{
-		Name:  "graphql",
-		Desc:  "Serve API via GraphQL",
-		Value: true,
-	})
-	enableHeartBeat := app.Bool(cli.BoolOpt{
-		Name:  "heartbeat",
-		Desc:  "Accept heartbeats",
-		Value: true,
-	})
-	enableMetrics := app.Bool(cli.BoolOpt{
-		Name:   "metrics",
-		Desc:   "Enable prometheus metrics",
-		EnvVar: "ENABLE_PROMETHEUS",
-		Value:  true,
-	})
+	var (
+		enableGraphQL = app.Bool(cli.BoolOpt{
+			Name:  "graphql",
+			Desc:  "Serve API via GraphQL",
+			Value: true,
+		})
+		enableHeartBeat = app.Bool(cli.BoolOpt{
+			Name:  "heartbeat",
+			Desc:  "Accept heartbeats",
+			Value: true,
+		})
+		enableMetrics = app.Bool(cli.BoolOpt{
+			Name:   "metrics",
+			Desc:   "Enable prometheus metrics",
+			EnvVar: "ENABLE_PROMETHEUS",
+			Value:  true,
+		})
+		webListenAddr = app.String(cli.StringOpt{
+			Name:   "L listen",
+			Desc:   "Sets listen address for web server",
+			EnvVar: "LISTEN_ADDR",
+			Value:  "0.0.0.0:8092",
+		})
+	)
+	// Specify the action to execute when the app is invoked correctly
+	app.Action = func() {
+	}
 	if err := app.Run(os.Args); err != nil {
 		log.Fatalln(err)
 	}
@@ -166,9 +179,8 @@ func main() {
 		r.GET("/graphql", graphQL)
 	}
 
-	// TODO: port configuration using mow.cli
 	if *enableGraphQL || *enableHeartBeat {
-		r.Run("0.0.0.0:8092")
+		r.Run(*webListenAddr)
 	} else {
 		log.Fatal("Either GraphQL or Heartbeat should be enabled")
 	}
