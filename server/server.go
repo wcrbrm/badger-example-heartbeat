@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -183,12 +184,12 @@ func main() {
 			// Use the transaction...
 			err := txn.Set([]byte("exampleKey"), []byte("exampleValue"))
 			if err != nil {
-				c.JSON(426, gin.H{"error": err})
+				c.JSON(400, gin.H{"error": err})
 				return
 			}
 			// Commit the transaction and check for error.
 			if err := txn.Commit(); err != nil {
-				c.JSON(426, gin.H{"error": err})
+				c.JSON(400, gin.H{"error": err})
 				return
 			}
 			c.JSON(200, gin.H{"message": "ok"})
@@ -196,6 +197,30 @@ func main() {
 
 		r.GET("/active", func(c *gin.Context) {
 
+			err := db.View(func(txn *badger.Txn) error {
+				opts := badger.DefaultIteratorOptions
+				opts.PrefetchSize = 10
+				it := txn.NewIterator(opts)
+				defer it.Close()
+				for it.Rewind(); it.Valid(); it.Next() {
+					item := it.Item()
+					k := item.Key()
+					err := item.Value(func(v []byte) error {
+						fmt.Printf("key=%s, value=%s\n", k, v)
+						return nil
+					})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+
+			if err != nil {
+				c.JSON(400, gin.H{"error": err})
+			} else {
+				c.JSON(200, gin.H{"message": "ok"})
+			}
 		})
 	}
 
