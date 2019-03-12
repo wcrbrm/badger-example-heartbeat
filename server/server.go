@@ -205,13 +205,11 @@ func main() {
 				for it.Rewind(); it.Valid(); it.Next() {
 					item := it.Item()
 					k := item.Key()
-					err := item.Value(func(v []byte) error {
-						fmt.Printf("key=%s, value=%s\n", k, v)
-						return nil
-					})
+					value, err := item.ValueCopy(nil)
 					if err != nil {
 						return err
 					}
+					fmt.Println("key=", string(k), "value=", string(value))
 				}
 				return nil
 			})
